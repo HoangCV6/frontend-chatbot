@@ -4,13 +4,28 @@ import axios from "axios";
 import ReactMarkdown from 'react-markdown';
 
 export default function ChatApp() {
+  const [user, setUser] = useState(null);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await axios.post(`${API_URL}/auth/login?username=${name}&phone=${phone}`);
+      setUser(res.data); // Lưu thông tin user bao gồm user_id
+    } catch (err) {
+      alert("Không thể kết nối Backend. Hãy kiểm tra URL Render!");
+    }
+  };
+
   const sendMessage = async (e) => {
     e.preventDefault();
-    if (!input) return;
+    if (!input || !user) return;
 
     const userMsg = { role: "user", content: input };
     setMessages((prev) => [...prev, userMsg]);
@@ -18,64 +33,75 @@ export default function ChatApp() {
     setLoading(true);
 
     try {
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/chat/send`, {
-        user_id: 1, // Tạm thời để fix
+      const res = await axios.post(`${API_URL}/chat/send`, {
+        user_id: user.user_id,
         content: input
       });
       setMessages((prev) => [...prev, res.data]);
     } catch (err) {
-      console.error(err);
+      alert("Lỗi kết nối chatbot!");
     } finally {
       setLoading(false);
     }
   };
 
+  // MÀN HÌNH ĐĂNG NHẬP
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-[#f0f2f5]">
+        <form onSubmit={handleLogin} className="p-8 bg-white shadow-2xl rounded-3xl w-full max-w-md border border-gray-100">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-extrabold text-blue-700">TOSHIKO AI</h2>
+            <p className="text-gray-500 mt-2">Vui lòng nhập thông tin để bắt đầu tư vấn</p>
+          </div>
+          <input className="w-full p-4 mb-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-black" 
+                 placeholder="Họ và tên của bạn" value={name} onChange={e=>setName(e.target.value)} required />
+          <input className="w-full p-4 mb-6 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-black" 
+                 placeholder="Số điện thoại" value={phone} onChange={e=>setPhone(e.target.value)} required />
+          <button className="w-full bg-blue-600 text-white p-4 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg">Bắt đầu trò chuyện</button>
+        </form>
+      </div>
+    );
+  }
+
+  // MÀN HÌNH CHAT PHONG CÁCH GEMINI
   return (
-    <div className="flex flex-col h-screen bg-[#f9f9f9] font-sans">
+    <div className="flex flex-col h-screen bg-white">
       {/* Header */}
-      <div className="p-4 bg-white border-b flex justify-between items-center shadow-sm">
-        <h1 className="text-xl font-bold text-blue-700">TOSHIKO AI Assistant</h1>
-        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">T</div>
+      <div className="px-6 py-4 border-b flex justify-between items-center shadow-sm">
+        <span className="font-bold text-xl text-blue-600">Toshiko T90 Advisor</span>
+        <div className="text-sm text-gray-500 italic">Chào, {user.username}</div>
       </div>
 
-      {/* Chat Box */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
-        {messages.length === 0 && (
-          <div className="text-center mt-20">
-            <h2 className="text-3xl font-medium text-gray-300">Tôi có thể giúp gì cho bạn?</h2>
-          </div>
-        )}
-        
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-10 space-y-6">
         {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}>
-            <div className={`max-w-[80%] p-4 rounded-2xl ${
+          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[85%] p-5 rounded-[2rem] shadow-sm ${
               m.role === 'user' 
-              ? 'bg-[#e3efff] text-[#084298] rounded-tr-none' 
-              : 'bg-white shadow-sm border border-gray-100 rounded-tl-none text-gray-800'
+              ? 'bg-[#004aad] text-white rounded-tr-none' 
+              : 'bg-[#f0f4f9] text-gray-800 rounded-tl-none'
             }`}>
-              <ReactMarkdown className="prose prose-sm">{m.content}</ReactMarkdown>
+              <ReactMarkdown className="prose prose-sm max-w-none">{m.content}</ReactMarkdown>
             </div>
           </div>
         ))}
-        {loading && <div className="text-gray-400 text-sm animate-pulse">Toshiko đang trả lời...</div>}
+        {loading && <div className="text-blue-400 animate-pulse ml-4">Đang xử lý...</div>}
       </div>
 
-      {/* Input Area - Kiểu Gemini */}
-      <div className="p-4 bg-white">
-        <form onSubmit={sendMessage} className="max-w-3xl mx-auto relative flex items-center">
+      {/* Input */}
+      <div className="p-4 md:pb-10 bg-white">
+        <form onSubmit={sendMessage} className="max-w-4xl mx-auto relative group">
           <input 
-            className="w-full p-4 pr-12 rounded-full border border-gray-200 focus:outline-none focus:border-blue-400 shadow-sm text-black"
-            placeholder="Hỏi Toshiko về ghế T90..."
+            className="w-full p-5 pr-14 rounded-full bg-[#f0f4f9] border-none focus:ring-2 focus:ring-blue-200 outline-none text-black text-lg shadow-inner"
+            placeholder="Đặt câu hỏi về ghế T90..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
           />
-          <button className="absolute right-3 p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-            </svg>
+          <button className="absolute right-3 top-2.5 p-3 bg-blue-600 text-white rounded-full hover:scale-110 transition-transform shadow-md">
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
           </button>
         </form>
-        <p className="text-[10px] text-center text-gray-400 mt-2">AI có thể đưa ra câu trả lời nhầm lẫn, hãy kiểm tra lại thông tin quan trọng.</p>
       </div>
     </div>
   );
